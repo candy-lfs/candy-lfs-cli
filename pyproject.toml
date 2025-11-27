@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "candy-lfs"
+version = "0.1.0"
+description = "CLI tool for Candy LFS - Git LFS server with GitHub authentication"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Candy LFS Team"}
+]
+keywords = ["git", "lfs", "cli", "storage"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "click>=8.1.0",
+    "requests>=2.31.0",
+    "rich>=13.0.0",
+    "keyring>=24.0.0",
+    "pyyaml>=6.0.0",
+    "pyinstaller>=6.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "types-requests>=2.31.0",
+    "types-pyyaml>=6.0.0",
+]
+
+[project.scripts]
+candy-lfs = "candy_lfs.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/candy-lfs/candy-lfs-cli"
+Repository = "https://github.com/candy-lfs/candy-lfs-cli"
+Issues = "https://github.com/candy-lfs/candy-lfs-cli/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/candy_lfs"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39", "py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "T20", "RET", "SIM", "ARG"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
