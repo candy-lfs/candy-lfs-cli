@@ -61,12 +61,12 @@ jobs:
       - name: Build with PyInstaller (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          pyinstaller --onefile --name candy-lfs-${{ matrix.platform }}-${{ matrix.arch }} src/candy_lfs/__main__.py
-      
+          pyinstaller --onefile --collect-all candy_lfs --name candy-lfs-${{ matrix.platform }}-${{ matrix.arch }} src/candy_lfs/__main__.py
+
       - name: Build with PyInstaller (Windows)
         if: runner.os == 'Windows'
         run: |
-          pyinstaller --onefile --name candy-lfs-${{ matrix.platform }}-${{ matrix.arch }}.exe src/candy_lfs/__main__.py
+          pyinstaller --onefile --collect-all candy_lfs --name candy-lfs-${{ matrix.platform }}-${{ matrix.arch }}.exe src/candy_lfs/__main__.py
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
