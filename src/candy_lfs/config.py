@@ -9,7 +9,12 @@ import yaml
 
 CONFIG_DIR = Path.home() / ".candy-lfs"
 CONFIG_FILE = CONFIG_DIR / "config.yaml"
-DEFAULT_API_ENDPOINT = os.getenv("CANDY_LFS_API_ENDPOINT", "")
+
+__BUILD_API_ENDPOINT__ = ""
+__BUILD_LFS_ENDPOINT__ = ""
+
+DEFAULT_API_ENDPOINT = __BUILD_API_ENDPOINT__ or os.getenv("CANDY_LFS_API_ENDPOINT", "")
+DEFAULT_LFS_ENDPOINT = __BUILD_LFS_ENDPOINT__ or os.getenv("CANDY_LFS_LFS_ENDPOINT", "")
 
 
 class Config:
@@ -41,6 +46,15 @@ class Config:
     @api_endpoint.setter
     def api_endpoint(self, value: str) -> None:
         self._config["api_endpoint"] = value
+        self._save_config()
+
+    @property
+    def lfs_endpoint(self) -> str:
+        return self._config.get("lfs_endpoint", DEFAULT_LFS_ENDPOINT)
+
+    @lfs_endpoint.setter
+    def lfs_endpoint(self, value: str) -> None:
+        self._config["lfs_endpoint"] = value
         self._save_config()
 
     @property
