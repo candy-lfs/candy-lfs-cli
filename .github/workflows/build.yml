@@ -44,6 +44,7 @@ jobs:
           pip install -e .
       
       - name: Embed API endpoints
+        shell: bash
         env:
           API_ENDPOINT: ${{ secrets.CANDY_LFS_API_ENDPOINT }}
           LFS_ENDPOINT: ${{ secrets.CANDY_LFS_LFS_ENDPOINT }}
