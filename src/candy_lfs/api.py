@@ -38,7 +38,19 @@ class APIClient:
             if response.status_code >= 400:
                 try:
                     error_data = response.json()
-                    message = error_data.get("message", response.text)
+                    # OAuth format: {error, error_description}
+                    if "error" in error_data and "error_description" in error_data:
+                        message = error_data.get("error_description", error_data.get("error", "unknown_error"))
+                    elif "error" in error_data:
+                        message = error_data.get("error", "unknown_error")
+                    # Management API format: {error, details, request_id}
+                    else:
+                        message = error_data.get("error", error_data.get("message", response.text))
+                        # Append validation details if present
+                        if "details" in error_data and error_data["details"]:
+                            details_str = ", ".join(str(d) for d in error_data["details"] if d)
+                            if details_str:
+                                message = f"{message}: {details_str}"
                 except Exception:
                     message = response.text
                 raise APIError(response.status_code, message, error_data if 'error_data' in locals() else None)
