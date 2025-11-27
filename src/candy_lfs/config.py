@@ -67,15 +67,6 @@ class Config:
         self._save_config()
 
     def _get_git_credential_info(self, tenant_id: str) -> tuple[str, str]:
-        """Returns (host, path) for git credential (Management API)"""
-        if self.api_endpoint:
-            parsed = urlparse(self.api_endpoint)
-            base_path = parsed.path.strip('/')
-            path = f"{base_path}/{tenant_id}" if base_path else tenant_id
-            return (parsed.netloc, path)
-        return ("candy-lfs.local", tenant_id)
-
-    def _get_lfs_credential_info(self, tenant_id: str) -> tuple[str, str]:
         """Returns (host, path) for git credential (LFS API)"""
         if self.lfs_endpoint:
             parsed = urlparse(self.lfs_endpoint)
@@ -147,16 +138,6 @@ class Config:
 
     def delete_github_token(self, tenant_id: str) -> None:
         host, path = self._get_git_credential_info(tenant_id)
-        self._git_credential_erase(host, path, tenant_id)
-
-    def set_lfs_token(self, tenant_id: str, token: str) -> None:
-        """Store token for LFS API access"""
-        host, path = self._get_lfs_credential_info(tenant_id)
-        self._git_credential_store(host, path, tenant_id, token)
-
-    def delete_lfs_token(self, tenant_id: str) -> None:
-        """Delete token for LFS API access"""
-        host, path = self._get_lfs_credential_info(tenant_id)
         self._git_credential_erase(host, path, tenant_id)
 
     def get_tenant_list(self) -> list[dict[str, Any]]:

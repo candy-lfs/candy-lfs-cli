@@ -95,7 +95,6 @@ def login(tenant_id: str) -> None:
         github_user = token_response["github_user"]
         permission = token_response["permission"]
         config.set_github_token(tenant_id, token)
-        config.set_lfs_token(tenant_id, token)
         config.add_tenant(tenant_id, tenant_id, "member")  # Default role
         if not config.current_tenant:
             config.current_tenant = tenant_id
@@ -118,7 +117,6 @@ def logout(tenant_id: Optional[str]) -> None:
         if not tenant_id:
             raise click.ClickException("No tenant specified and no current tenant selected")
     config.delete_github_token(tenant_id)
-    config.delete_lfs_token(tenant_id)
     config.delete_token(tenant_id)
     if config.current_tenant == tenant_id:
         config.current_tenant = None
