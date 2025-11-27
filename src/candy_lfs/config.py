@@ -52,17 +52,22 @@ class Config:
         self._config["current_tenant"] = value
         self._save_config()
 
-    def _get_git_credential_host(self, tenant_id: str) -> str:
+    def _get_git_credential_info(self, tenant_id: str) -> tuple[str, str]:
+        """Returns (host, path) for git credential"""
         if self.api_endpoint:
             parsed = urlparse(self.api_endpoint)
-            return f"{tenant_id}.{parsed.netloc}"
-        return f"{tenant_id}.candy-lfs.local"
+            # Extract path without leading/trailing slashes
+            base_path = parsed.path.strip('/')
+            # Add tenant to path: v1/tenant_id
+            path = f"{base_path}/{tenant_id}" if base_path else tenant_id
+            return (parsed.netloc, path)
+        return ("candy-lfs.local", tenant_id)
 
-    def _git_credential_get(self, host: str, username: str) -> Optional[str]:
+    def _git_credential_get(self, host: str, path: str, username: str) -> Optional[str]:
         try:
             result = subprocess.run(
                 ["git", "credential", "fill"],
-                input=f"protocol=https\nhost={host}\nusername={username}\n\n",
+                input=f"protocol=https\nhost={host}\npath={path}\nusername={username}\n\n",
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -75,11 +80,11 @@ class Config:
             pass
         return None
 
-    def _git_credential_store(self, host: str, username: str, password: str) -> None:
+    def _git_credential_store(self, host: str, path: str, username: str, password: str) -> None:
         try:
             subprocess.run(
                 ["git", "credential", "approve"],
-                input=f"protocol=https\nhost={host}\nusername={username}\npassword={password}\n\n",
+                input=f"protocol=https\nhost={host}\npath={path}\nusername={username}\npassword={password}\n\n",
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -87,11 +92,11 @@ class Config:
         except Exception:
             pass
 
-    def _git_credential_erase(self, host: str, username: str) -> None:
+    def _git_credential_erase(self, host: str, path: str, username: str) -> None:
         try:
             subprocess.run(
                 ["git", "credential", "reject"],
-                input=f"protocol=https\nhost={host}\nusername={username}\n\n",
+                input=f"protocol=https\nhost={host}\npath={path}\nusername={username}\n\n",
                 capture_output=True,
                 text=True,
                 timeout=5
@@ -100,28 +105,28 @@ class Config:
             pass
 
     def get_token(self, tenant_id: str) -> Optional[str]:
-        host = self._get_git_credential_host(tenant_id)
-        return self._git_credential_get(host, "token")
+        host, path = self._get_git_credential_info(tenant_id)
+        return self._git_credential_get(host, path, "token")
 
     def set_token(self, tenant_id: str, token: str) -> None:
-        host = self._get_git_credential_host(tenant_id)
-        self._git_credential_store(host, "token", token)
+        host, path = self._get_git_credential_info(tenant_id)
+        self._git_credential_store(host, path, "token", token)
 
     def delete_token(self, tenant_id: str) -> None:
-        host = self._get_git_credential_host(tenant_id)
-        self._git_credential_erase(host, "token")
+        host, path = self._get_git_credential_info(tenant_id)
+        self._git_credential_erase(host, path, "token")
 
     def get_github_token(self, tenant_id: str) -> Optional[str]:
-        host = self._get_git_credential_host(tenant_id)
-        return self._git_credential_get(host, "github")
+        host, path = self._get_git_credential_info(tenant_id)
+        return self._git_credential_get(host, path, tenant_id)
 
     def set_github_token(self, tenant_id: str, token: str) -> None:
-        host = self._get_git_credential_host(tenant_id)
-        self._git_credential_store(host, "github", token)
+        host, path = self._get_git_credential_info(tenant_id)
+        self._git_credential_store(host, path, tenant_id, token)
 
     def delete_github_token(self, tenant_id: str) -> None:
-        host = self._get_git_credential_host(tenant_id)
-        self._git_credential_erase(host, "github")
+        host, path = self._get_git_credential_info(tenant_id)
+        self._git_credential_erase(host, path, tenant_id)
 
     def get_tenant_list(self) -> list[dict[str, Any]]:
         return self._config.get("tenants", [])
