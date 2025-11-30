@@ -1,4 +1,4 @@
-name: Build Binaries
+name: Build Binaries and Installers
 
 on:
   push:
@@ -26,23 +26,23 @@ jobs:
           - os: windows-latest
             arch: x86_64
             platform: windows
-    
+
     runs-on: ${{ matrix.os }}
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller
           pip install -e .
-      
+
       - name: Embed API endpoints
         shell: bash
         env:
@@ -60,32 +60,197 @@ jobs:
           open(path, 'w').write(content)
           "
 
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(python -c "from candy_lfs import __version__; print(__version__)")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Build with PyInstaller (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          pyinstaller --onefile --collect-all candy_lfs --name candy-lfs-${{ matrix.platform }}-${{ matrix.arch }} src/candy_lfs/__main__.py
+          pyinstaller --onefile --collect-all candy_lfs --name candylfs src/candy_lfs/__main__.py
 
       - name: Build with PyInstaller (Windows)
         if: runner.os == 'Windows'
         run: |
-          pyinstaller --onefile --collect-all candy_lfs --name candy-lfs-${{ matrix.platform }}-${{ matrix.arch }}.exe src/candy_lfs/__main__.py
-      
-      - name: Upload artifact
+          pyinstaller --onefile --collect-all candy_lfs --name candylfs src/candy_lfs/__main__.py
+
+      - name: Create macOS installer
+        if: matrix.platform == 'darwin'
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          ARCH=${{ matrix.arch }}
+
+          # Create package structure
+          mkdir -p pkg_root/usr/local/bin
+          cp dist/candylfs pkg_root/usr/local/bin/
+          chmod +x pkg_root/usr/local/bin/candylfs
+
+          # Build component package
+          pkgbuild --root pkg_root \
+                   --identifier com.candy-lfs.cli \
+                   --version "$VERSION" \
+                   --install-location / \
+                   candy-lfs-component.pkg
+
+          # Create distribution XML
+          cat > distribution.xml << EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <installer-gui-script minSpecVersion="1">
+              <title>Candy LFS CLI</title>
+              <organization>com.candy-lfs</organization>
+              <domains enable_localSystem="true"/>
+              <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+              <pkg-ref id="com.candy-lfs.cli"/>
+              <choices-outline>
+                  <line choice="default">
+                      <line choice="com.candy-lfs.cli"/>
+                  </line>
+              </choices-outline>
+              <choice id="default"/>
+              <choice id="com.candy-lfs.cli" visible="false">
+                  <pkg-ref id="com.candy-lfs.cli"/>
+              </choice>
+              <pkg-ref id="com.candy-lfs.cli" version="$VERSION">candy-lfs-component.pkg</pkg-ref>
+          </installer-gui-script>
+          EOF
+
+          # Build product archive
+          productbuild --distribution distribution.xml \
+                       --package-path . \
+                       "dist/candy-lfs-${VERSION}-darwin-${ARCH}.pkg"
+
+      - name: Create Windows installer
+        if: matrix.platform == 'windows'
+        run: |
+          $VERSION = "${{ steps.version.outputs.version }}"
+
+          # Create Inno Setup script
+          @"
+          [Setup]
+          AppName=Candy LFS CLI
+          AppVersion=$VERSION
+          AppPublisher=Candy LFS Team
+          DefaultDirName={autopf}\CandyLFS
+          DefaultGroupName=Candy LFS
+          OutputDir=dist
+          OutputBaseFilename=candy-lfs-$VERSION-windows-x86_64-installer
+          Compression=lzma
+          SolidCompression=yes
+          ArchitecturesAllowed=x64compatible
+          ArchitecturesInstallIn64BitMode=x64compatible
+          ChangesEnvironment=yes
+
+          [Files]
+          Source: "dist\candylfs.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+          [Icons]
+          Name: "{group}\Candy LFS CLI"; Filename: "{app}\candylfs.exe"
+
+          [Registry]
+          Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; \
+              ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; \
+              Check: NeedsAddPath('{app}')
+
+          [Code]
+          function NeedsAddPath(Param: string): boolean;
+          var
+            OrigPath: string;
+          begin
+            if not RegQueryStringValue(HKEY_LOCAL_MACHINE,
+              'SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
+              'Path', OrigPath)
+            then begin
+              Result := True;
+              exit;
+            end;
+            Result := Pos(';' + Param + ';', ';' + OrigPath + ';') = 0;
+          end;
+          "@ | Out-File -FilePath "installer.iss" -Encoding UTF8
+
+          # Build installer
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      - name: Create Linux installers
+        if: matrix.platform == 'linux'
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          ARCH=${{ matrix.arch }}
+
+          # Install fpm
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev rubygems build-essential rpm
+          sudo gem install fpm
+
+          # Prepare binary
+          mkdir -p pkg_root/usr/local/bin
+          cp dist/candylfs pkg_root/usr/local/bin/
+          chmod +x pkg_root/usr/local/bin/candylfs
+
+          # Map architecture names
+          if [ "$ARCH" = "x86_64" ]; then
+            DEB_ARCH="amd64"
+            RPM_ARCH="x86_64"
+          else
+            DEB_ARCH="arm64"
+            RPM_ARCH="aarch64"
+          fi
+
+          # Create .deb package
+          fpm -s dir -t deb \
+              -n candy-lfs \
+              -v "$VERSION" \
+              -a "$DEB_ARCH" \
+              --description "CLI tool for Candy LFS - Git LFS server with GitHub authentication" \
+              --maintainer "Candy LFS Team" \
+              --url "https://github.com/candy-lfs/candy-lfs-cli" \
+              -C pkg_root \
+              -p "dist/candy-lfs-${VERSION}-linux-${ARCH}.deb" \
+              .
+
+          # Create .rpm package
+          fpm -s dir -t rpm \
+              -n candy-lfs \
+              -v "$VERSION" \
+              -a "$RPM_ARCH" \
+              --description "CLI tool for Candy LFS - Git LFS server with GitHub authentication" \
+              --maintainer "Candy LFS Team" \
+              --url "https://github.com/candy-lfs/candy-lfs-cli" \
+              -C pkg_root \
+              -p "dist/candy-lfs-${VERSION}-linux-${ARCH}.rpm" \
+              .
+
+      - name: Rename binary
+        shell: bash
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          ARCH=${{ matrix.arch }}
+          PLATFORM=${{ matrix.platform }}
+
+          if [ "$PLATFORM" = "windows" ]; then
+            mv dist/candylfs.exe "dist/candylfs-${VERSION}-${PLATFORM}-${ARCH}.exe"
+          else
+            mv dist/candylfs "dist/candylfs-${VERSION}-${PLATFORM}-${ARCH}"
+          fi
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: candy-lfs-${{ matrix.platform }}-${{ matrix.arch }}
           path: dist/*
-  
+
   release:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
-    
+
     steps:
       - uses: actions/download-artifact@v4
-      
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
