@@ -77,13 +77,14 @@ def login(tenant_id: str) -> None:
         token = token_response["token"]
         github_user = token_response["github_user"]
         permission = token_response["permission"]
-        repo_name = token_response.get("repo_name")
-        config.set_github_token(tenant_id, token, repo_name)
+        repo_names = token_response.get("repo_names", [])
+        for rn in repo_names:
+            config.set_github_token(tenant_id, token, rn)
         config.add_tenant(tenant_id, tenant_id)
         if not config.current_tenant:
             config.current_tenant = tenant_id
         console.print(f"[green]✓[/green] Logged in as [bold]{github_user}[/bold] ({permission})")
-        console.print(f"[green]✓[/green] Token stored for tenant: {tenant_id}")
+        console.print(f"[green]✓[/green] Token stored for {len(repo_names)} repositories in tenant: {tenant_id}")
     except APIError as e:
         console.print(f"[red]✗[/red] {e.message}", style="bold red")
         if e.status_code:
