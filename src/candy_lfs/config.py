@@ -120,12 +120,33 @@ class Config:
         except Exception:
             pass
 
+    def _ensure_use_http_path(self, host: str) -> None:
+        """Ensure useHttpPath is enabled for the LFS host to support multi-tenant credentials."""
+        config_key = f"credential.https://{host}.useHttpPath"
+        try:
+            result = subprocess.run(
+                ["git", "config", "--global", "--get", config_key],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode != 0 or result.stdout.strip() != "true":
+                subprocess.run(
+                    ["git", "config", "--global", config_key, "true"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+        except Exception:
+            pass
+
     def get_github_token(self, tenant_id: str, repo_name: Optional[str] = None) -> Optional[str]:
         host, path = self._get_git_credential_info(tenant_id, repo_name)
         return self._git_credential_get(host, path, tenant_id)
 
     def set_github_token(self, tenant_id: str, token: str, repo_name: Optional[str] = None) -> None:
         host, path = self._get_git_credential_info(tenant_id, repo_name)
+        self._ensure_use_http_path(host)
         self._git_credential_store(host, path, tenant_id, token)
 
     def delete_github_token(self, tenant_id: str, repo_name: Optional[str] = None) -> None:
