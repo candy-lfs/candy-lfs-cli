@@ -66,13 +66,17 @@ class Config:
         self._config["current_tenant"] = value
         self._save_config()
 
-    def _get_git_credential_info(self, tenant_id: str) -> tuple[str, str]:
+    def _get_git_credential_info(self, tenant_id: str, repo_name: Optional[str] = None) -> tuple[str, str]:
         """Returns (host, path) for git credential (LFS API)"""
         if self.lfs_endpoint:
             parsed = urlparse(self.lfs_endpoint)
-            base_path = parsed.path.strip('/')
-            path = f"{base_path}/{tenant_id}" if base_path else tenant_id
+            if repo_name:
+                path = f"{tenant_id}/{repo_name}"
+            else:
+                path = tenant_id
             return (parsed.netloc, path)
+        if repo_name:
+            return ("candy-lfs.local", f"{tenant_id}/{repo_name}")
         return ("candy-lfs.local", tenant_id)
 
     def _git_credential_get(self, host: str, path: str, username: str) -> Optional[str]:
@@ -116,16 +120,16 @@ class Config:
         except Exception:
             pass
 
-    def get_github_token(self, tenant_id: str) -> Optional[str]:
-        host, path = self._get_git_credential_info(tenant_id)
+    def get_github_token(self, tenant_id: str, repo_name: Optional[str] = None) -> Optional[str]:
+        host, path = self._get_git_credential_info(tenant_id, repo_name)
         return self._git_credential_get(host, path, tenant_id)
 
-    def set_github_token(self, tenant_id: str, token: str) -> None:
-        host, path = self._get_git_credential_info(tenant_id)
+    def set_github_token(self, tenant_id: str, token: str, repo_name: Optional[str] = None) -> None:
+        host, path = self._get_git_credential_info(tenant_id, repo_name)
         self._git_credential_store(host, path, tenant_id, token)
 
-    def delete_github_token(self, tenant_id: str) -> None:
-        host, path = self._get_git_credential_info(tenant_id)
+    def delete_github_token(self, tenant_id: str, repo_name: Optional[str] = None) -> None:
+        host, path = self._get_git_credential_info(tenant_id, repo_name)
         self._git_credential_erase(host, path, tenant_id)
 
     def get_tenant_list(self) -> list[dict[str, Any]]:

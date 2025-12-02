@@ -77,7 +77,8 @@ def login(tenant_id: str) -> None:
         token = token_response["token"]
         github_user = token_response["github_user"]
         permission = token_response["permission"]
-        config.set_github_token(tenant_id, token)
+        repo_name = token_response.get("repo_name")
+        config.set_github_token(tenant_id, token, repo_name)
         config.add_tenant(tenant_id, tenant_id)
         if not config.current_tenant:
             config.current_tenant = tenant_id
