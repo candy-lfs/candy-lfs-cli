@@ -102,16 +102,48 @@ class Config:
         return None
 
     def _git_credential_store(self, host: str, path: str, username: str, password: str) -> None:
+        # Try git credential approve first
         try:
-            subprocess.run(
+            result = subprocess.run(
                 ["git", "credential", "approve"],
                 input=f"protocol=https\nhost={host}\npath={path}\nusername={username}\npassword={password}\n\n",
                 capture_output=True,
                 text=True,
                 timeout=5
             )
+            # Verify if credential was actually stored
+            stored = self._git_credential_get(host, path, username)
+            if stored == password:
+                return
         except Exception:
             pass
+
+        # Fallback: directly write to .git-credentials file
+        self._write_git_credentials_file(host, path, username, password)
+
+    def _get_git_credentials_path(self) -> Path:
+        """Get the path to .git-credentials file."""
+        return Path.home() / ".git-credentials"
+
+    def _write_git_credentials_file(self, host: str, path: str, username: str, password: str) -> None:
+        """Directly write credential to .git-credentials file."""
+        from urllib.parse import quote
+        cred_file = self._get_git_credentials_path()
+        cred_url = f"https://{quote(username, safe='')}:{quote(password, safe='')}@{host}/{path}"
+
+        # Read existing credentials
+        existing_lines: list[str] = []
+        if cred_file.exists():
+            existing_lines = cred_file.read_text(encoding="utf-8").splitlines()
+
+        # Remove any existing entry for this host/path
+        new_lines = [line for line in existing_lines if f"@{host}/{path}" not in line]
+
+        # Add the new credential
+        new_lines.append(cred_url)
+
+        # Write back
+        cred_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
 
     def _git_credential_erase(self, host: str, path: str, username: str) -> None:
         try:
@@ -124,6 +156,13 @@ class Config:
             )
         except Exception:
             pass
+
+        # Also remove from .git-credentials file
+        cred_file = self._get_git_credentials_path()
+        if cred_file.exists():
+            lines = cred_file.read_text(encoding="utf-8").splitlines()
+            new_lines = [line for line in lines if f"@{host}/{path}" not in line]
+            cred_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
 
     def _ensure_use_http_path(self, host: str) -> None:
         """Ensure useHttpPath is enabled for the LFS host to support multi-tenant credentials."""
