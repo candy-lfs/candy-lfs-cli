@@ -78,8 +78,10 @@ def login(tenant_id: str) -> None:
         github_user = token_response["github_user"]
         permission = token_response["permission"]
         repo_names = token_response.get("repo_names", [])
+        config.delete_all_tenant_credentials(tenant_id)
         for rn in repo_names:
             config.set_github_token(tenant_id, token, rn)
+        config.set_tenant_repos(tenant_id, repo_names)
         config.add_tenant(tenant_id, tenant_id)
         if not config.current_tenant:
             config.current_tenant = tenant_id

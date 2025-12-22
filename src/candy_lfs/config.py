@@ -153,6 +153,33 @@ class Config:
         host, path = self._get_git_credential_info(tenant_id, repo_name)
         self._git_credential_erase(host, path, tenant_id)
 
+    def delete_all_tenant_credentials(self, tenant_id: str) -> None:
+        """Delete all credentials for a tenant (all repositories)."""
+        repo_names = self.get_tenant_repos(tenant_id)
+        for repo_name in repo_names:
+            self.delete_github_token(tenant_id, repo_name)
+        self._clear_tenant_repos(tenant_id)
+
+    def get_tenant_repos(self, tenant_id: str) -> list[str]:
+        """Get list of repository names for a tenant."""
+        tenant_repos = self._config.get("tenant_repos", {})
+        return tenant_repos.get(tenant_id, [])
+
+    def set_tenant_repos(self, tenant_id: str, repo_names: list[str]) -> None:
+        """Set the list of repository names for a tenant."""
+        if "tenant_repos" not in self._config:
+            self._config["tenant_repos"] = {}
+        self._config["tenant_repos"][tenant_id] = repo_names
+        self._save_config()
+
+    def _clear_tenant_repos(self, tenant_id: str) -> None:
+        """Clear the repository list for a tenant."""
+        tenant_repos = self._config.get("tenant_repos", {})
+        if tenant_id in tenant_repos:
+            del tenant_repos[tenant_id]
+            self._config["tenant_repos"] = tenant_repos
+            self._save_config()
+
     def get_tenant_list(self) -> list[dict[str, Any]]:
         return self._config.get("tenants", [])
 
