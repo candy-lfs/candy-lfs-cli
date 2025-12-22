@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import urllib.request
 from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -12,6 +13,10 @@ CONFIG_FILE = CONFIG_DIR / "config.yaml"
 
 __BUILD_API_ENDPOINT__ = ""
 __BUILD_LFS_ENDPOINT__ = ""
+__BUILD_COMMIT__ = ""
+__BUILD_TAG__ = ""
+
+GITHUB_REPO = "candylfs/candylfs-cli"
 
 DEFAULT_API_ENDPOINT = __BUILD_API_ENDPOINT__ or os.getenv("CANDY_LFS_API_ENDPOINT", "")
 DEFAULT_LFS_ENDPOINT = __BUILD_LFS_ENDPOINT__ or os.getenv("CANDY_LFS_LFS_ENDPOINT", "")
@@ -199,3 +204,29 @@ class Config:
         self._config["tenants"] = [t for t in tenants if t["tenant_id"] != tenant_id]
         self._save_config()
         self.delete_github_token(tenant_id)
+
+
+def check_for_updates() -> Optional[dict[str, str]]:
+    """Check if a newer version is available on GitHub releases.
+
+    Returns:
+        dict with 'latest_tag' and 'download_url' if update available, None otherwise.
+    """
+    if not __BUILD_TAG__:
+        return None
+
+    try:
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+        req = urllib.request.Request(url, headers={"Accept": "application/vnd.github.v3+json"})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            latest_tag = data.get("tag_name", "")
+            if latest_tag and latest_tag != __BUILD_TAG__:
+                return {
+                    "latest_tag": latest_tag,
+                    "current_tag": __BUILD_TAG__,
+                    "download_url": data.get("html_url", f"https://github.com/{GITHUB_REPO}/releases/latest"),
+                }
+    except Exception:
+        pass
+    return None

@@ -43,11 +43,13 @@ jobs:
           pip install pyinstaller
           pip install -e .
 
-      - name: Embed API endpoints
+      - name: Embed API endpoints and build info
         shell: bash
         env:
           API_ENDPOINT: ${{ secrets.CANDY_LFS_API_ENDPOINT }}
           LFS_ENDPOINT: ${{ secrets.CANDY_LFS_LFS_ENDPOINT }}
+          BUILD_COMMIT: ${{ github.sha }}
+          BUILD_TAG: ${{ github.ref_name }}
         run: |
           python -c "
           import os
@@ -55,8 +57,12 @@ jobs:
           content = open(path).read()
           api = os.environ.get('API_ENDPOINT', '').strip()
           lfs = os.environ.get('LFS_ENDPOINT', '').strip()
+          commit = os.environ.get('BUILD_COMMIT', '').strip()
+          tag = os.environ.get('BUILD_TAG', '').strip()
           content = content.replace('__BUILD_API_ENDPOINT__ = \"\"', f'__BUILD_API_ENDPOINT__ = \"{api}\"')
           content = content.replace('__BUILD_LFS_ENDPOINT__ = \"\"', f'__BUILD_LFS_ENDPOINT__ = \"{lfs}\"')
+          content = content.replace('__BUILD_COMMIT__ = \"\"', f'__BUILD_COMMIT__ = \"{commit}\"')
+          content = content.replace('__BUILD_TAG__ = \"\"', f'__BUILD_TAG__ = \"{tag}\"')
           open(path, 'w').write(content)
           "
 
